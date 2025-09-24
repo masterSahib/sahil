@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBS University Gurdaspur - File Portal</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f4f4f9;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        form {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
+        }
+        input, button {
+            padding: 8px;
+            margin: 5px 0;
+        }
+        button {
+            background: #3498db;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0px 1px 3px rgba(0,0,0,0.2);
+        }
+        a {
+            color: #e74c3c;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        footer {
+            margin-top: 30px;
+            text-align: center;
+            color: gray;
+        }
+    </style>
+</head>
+<body>
+    <h1>SADAR BEANT SINGH UNIVERSITY, GURDASPUR</h1>
+
+    <!-- Register Form -->
+    <h2>Register</h2>
+    <form method="post" action="portal.php">
+        Username: <input type="text" name="username" required><br>
+        Password: <input type="password" name="password" required><br>
+        <button type="submit" name="register">Register</button>
+    </form>
+
+    <!-- Login Form -->
+    <h2>Login</h2>
+    <form method="post" action="portal.php">
+        Username: <input type="text" name="username" required><br>
+        Password: <input type="password" name="password" required><br>
+        <button type="submit" name="login">Login</button>
+    </form>
+
+    <!-- Dashboard (after login) -->
+    <h2>Welcome, USERNAME!</h2>
+    <a href="portal.php?logout=true">Logout</a>
+
+    <h3>Upload Files</h3>
+    <form method="post" action="portal.php" enctype="multipart/form-data">
+        <input type="file" name="files[]" multiple required>
+        <button type="submit" name="upload">Upload</button>
+    </form>
+
+    <h3>Your Files</h3>
+    <ul>
+        <li><a href="download.php?id=1">example.pdf</a> (2025-09-23 12:00:00)</li>
+        <li><a href="download.php?id=2">notes.docx</a> (2025-09-23 12:05:00)</li>
+    </ul>
+
+    <footer>
+        <p>© 2025 SADAR BEANT SINGH UNIVERSITY, GURDASPUR</p>
+    </footer>
+</body>
+</html>
