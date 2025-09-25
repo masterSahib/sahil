@@ -37,9 +37,7 @@
       <h2 class="text-xl font-semibold text-gray-700 mb-4">Search Files</h2>
       <input type="text" id="searchBar" placeholder="Search by filename..."
              class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 mb-4">
-      <ul id="fileList" class="space-y-3">
-        <!-- Files will be listed here dynamically -->
-      </ul>
+      <ul id="fileList" class="space-y-3"></ul>
     </section>
   </main>
 
@@ -49,9 +47,7 @@
   </footer>
 
   <script>
-    // ==============================
     // Google Drive API Configuration
-    // ==============================
     const CLIENT_ID = "1099354072671-jjktoufuar544998oar116jd98lua737.apps.googleusercontent.com";
     const API_KEY = "AIzaSyA1MhTQyOWe-Cl6wYcMbpD9qJL1N6ptSVI";
     const SCOPES = "https://www.googleapis.com/auth/drive.file";
@@ -60,7 +56,6 @@
     let gapiInited = false;
     let gisInited = false;
 
-    // Load Google API client
     function gapiLoaded() {
       gapi.load('client', initializeGapiClient);
     }
@@ -83,61 +78,94 @@
     }
 
     document.getElementById("loginBtn").onclick = () => {
-      if (!gapiInited || !gisInited) return;
+      if (!gapiInited || !gisInited) {
+        alert("⚠️ Google API not initialized yet.");
+        return;
+      }
       tokenClient.callback = (resp) => {
-        if (resp.error) throw(resp);
+        if (resp.error) {
+          alert("❌ Login failed: " + JSON.stringify(resp));
+          return;
+        }
+        document.getElementById("uploadStatus").innerText = "✅ Signed in. You can now upload files.";
         listFiles();
       };
-      tokenClient.requestAccessToken({prompt: 'consent'});
+      tokenClient.requestAccessToken({ prompt: "consent" });
     };
 
-    // Upload file
+    // Upload file with status
     document.getElementById("uploadBtn").onclick = async () => {
       const files = document.getElementById("fileInput").files;
-      if (files.length === 0) return alert("Please select files");
+      const status = document.getElementById("uploadStatus");
+
+      if (files.length === 0) {
+        status.innerText = "⚠️ Please select files before uploading.";
+        return;
+      }
 
       for (let file of files) {
-        const metadata = {
-          name: file.name,
-          mimeType: file.type
-        };
-        const form = new FormData();
-        form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-        form.append("file", file);
+        try {
+          status.innerText = `⏳ Uploading ${file.name}...`;
 
-        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-          method: "POST",
-          headers: new Headers({ "Authorization": "Bearer " + gapi.client.getToken().access_token }),
-          body: form
-        });
-        const result = await res.json();
-        document.getElementById("uploadStatus").innerText = `Uploaded: ${result.name}`;
+          const metadata = { name: file.name, mimeType: file.type };
+          const form = new FormData();
+          form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+          form.append("file", file);
+
+          const token = gapi.client.getToken();
+          if (!token) {
+            status.innerText = "❌ Error: You must sign in first.";
+            return;
+          }
+
+          const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + token.access_token },
+            body: form
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            status.innerText = `❌ Failed: ${file.name} (${err.error.message})`;
+            continue;
+          }
+
+          const result = await res.json();
+          status.innerText = `✅ Uploaded: ${result.name}`;
+        } catch (e) {
+          status.innerText = `❌ Error uploading ${file.name}: ${e.message}`;
+        }
       }
+
       listFiles();
     };
 
     // List files
     async function listFiles() {
-      let response = await gapi.client.drive.files.list({
-        'pageSize': 20,
-        'fields': 'files(id, name, webViewLink, createdTime)',
-      });
-      let files = response.result.files;
-      const list = document.getElementById("fileList");
-      list.innerHTML = "";
-      if (!files || files.length == 0) {
-        list.innerHTML = "<li class='text-gray-500'>No files found.</li>";
-        return;
+      try {
+        let response = await gapi.client.drive.files.list({
+          'pageSize': 20,
+          'fields': 'files(id, name, webViewLink, createdTime)',
+        });
+        let files = response.result.files;
+        const list = document.getElementById("fileList");
+        list.innerHTML = "";
+        if (!files || files.length == 0) {
+          list.innerHTML = "<li class='text-gray-500'>No files found.</li>";
+          return;
+        }
+        files.forEach(f => {
+          let li = document.createElement("li");
+          li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
+          li.innerHTML = `
+            <span>${f.name} <span class="text-sm text-gray-400">(${new Date(f.createdTime).toLocaleString()})</span></span>
+            <a href="${f.webViewLink}" target="_blank" class="text-blue-600 hover:underline">View</a>
+          `;
+          list.appendChild(li);
+        });
+      } catch (e) {
+        document.getElementById("uploadStatus").innerText = "❌ Error listing files: " + e.message;
       }
-      files.forEach(f => {
-        let li = document.createElement("li");
-        li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
-        li.innerHTML = `
-          <span>${f.name} <span class="text-sm text-gray-400">(${new Date(f.createdTime).toLocaleString()})</span></span>
-          <a href="${f.webViewLink}" target="_blank" class="text-blue-600 hover:underline">View</a>
-        `;
-        list.appendChild(li);
-      });
     }
 
     // Search filter
@@ -155,4 +183,3 @@
   <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
-
