@@ -42,7 +42,8 @@
   </footer>
 
   <script>
-    const BACKEND_URL = "https://beantnotes-ukb1.onrender.com"; // your live backend URL
+    // Use relative path so frontend works directly with the same backend domain
+    const BACKEND_URL = ""; 
 
     document.getElementById("uploadBtn").onclick = async () => {
       const files = document.getElementById("fileInput").files;
@@ -58,7 +59,7 @@
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch(`${BACKEND_URL}/upload`, {
+        const res = await fetch(`/upload`, {
           method: "POST",
           body: formData
         });
