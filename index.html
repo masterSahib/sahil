@@ -31,10 +31,17 @@
       <p id="uploadStatus" class="mt-2 text-sm text-gray-600"></p>
     </section>
 
-    <!-- Uploaded Files Section -->
+    <!-- Search Section -->
     <section class="bg-white rounded-2xl shadow p-6 mb-8">
-      <h2 class="text-xl font-semibold text-gray-700 mb-4">Uploaded Files</h2>
-      <ul id="fileList" class="space-y-3"></ul>
+      <h2 class="text-xl font-semibold text-gray-700 mb-4">Search Files</h2>
+      <input type="text" id="searchInput" placeholder="Enter filename..." class="border px-3 py-2 rounded-lg w-full mb-4">
+      <button id="searchBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+        Search
+      </button>
+      <button id="listAllBtn" class="ml-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+        List All Files
+      </button>
+      <ul id="fileList" class="space-y-3 mt-4"></ul>
     </section>
   </main>
 
@@ -120,13 +127,59 @@
       }
     }
 
+    // Search files
+    document.getElementById("searchBtn").onclick = async () => {
+      const query = document.getElementById("searchInput").value;
+      listFiles(query);
+    };
+
+    // List all files
+    document.getElementById("listAllBtn").onclick = async () => {
+      listFiles();
+    };
+
+    async function listFiles(query = "") {
+      try {
+        let q = query ? `name contains '${query}'` : "";
+        const response = await gapi.client.drive.files.list({
+          q: q,
+          pageSize: 20,
+          fields: "files(id, name, webViewLink, createdTime)"
+        });
+        const files = response.result.files;
+        const list = document.getElementById("fileList");
+        list.innerHTML = "";
+        if (!files || files.length === 0) {
+          list.innerHTML = "<li class='text-gray-500'>No files found.</li>";
+          return;
+        }
+        files.forEach(f => {
+          let li = document.createElement("li");
+          li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
+          li.innerHTML = `
+            <span>${f.name} <span class="text-sm text-gray-400">(${new Date(f.createdTime).toLocaleString()})</span></span>
+            <span>
+              <a href="${f.webViewLink}" target="_blank" class="text-blue-600 hover:underline mr-4">View</a>
+              <a href="https://www.googleapis.com/drive/v3/files/${f.id}?alt=media" target="_blank" class="text-green-600 hover:underline">Download</a>
+            </span>
+          `;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        alert("Error fetching files: " + err.message);
+      }
+    }
+
     function addFileToList(file) {
       const list = document.getElementById("fileList");
       let li = document.createElement("li");
       li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
       li.innerHTML = `
         <span>${file.name}</span>
-        <a href="https://drive.google.com/file/d/${file.id}/view" target="_blank" class="text-blue-600 hover:underline">View</a>
+        <span>
+          <a href="https://drive.google.com/file/d/${file.id}/view" target="_blank" class="text-blue-600 hover:underline mr-4">View</a>
+          <a href="https://www.googleapis.com/drive/v3/files/${file.id}?alt=media" target="_blank" class="text-green-600 hover:underline">Download</a>
+        </span>
       `;
       list.prepend(li);
     }
@@ -137,4 +190,3 @@
   <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
-
