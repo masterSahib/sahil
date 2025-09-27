@@ -1,39 +1,32 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 app = Flask(__name__)
-CORS(app)  # allow cross-origin from your frontend
+CORS(app)
 
-# Optional: limit max upload size (bytes). Set via env var MAX_UPLOAD_BYTES
-max_bytes = os.getenv("MAX_UPLOAD_BYTES")
-if max_bytes:
-    app.config["MAX_CONTENT_LENGTH"] = int(max_bytes)
-
-# Service account credentials path (Render secret file path)
-SERVICE_ACCOUNT_FILE = os.getenv(
-    "GOOGLE_APPLICATION_CREDENTIALS", "/etc/secrets/service-account.json"
-)
+# Service account credentials
+SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/etc/secrets/service-account.json")
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
-# Drive folder id (must be shared with the service account)
 FOLDER_ID = os.getenv("FOLDER_ID")
 if not FOLDER_ID:
     raise RuntimeError("FOLDER_ID environment variable is required")
 
-# Create credentials and Drive client
 credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES
 )
 drive_service = build("drive", "v3", credentials=credentials)
 
+# Serve index.html from root directory
 @app.route("/")
 def home():
-    return "✅ File upload service is running"
+    return send_from_directory(".", "index.html")
 
+# Upload endpoint
 @app.route("/upload", methods=["POST"])
 def upload():
     if "file" not in request.files:
@@ -43,7 +36,6 @@ def upload():
     filename = uploaded_file.filename
 
     file_metadata = {"name": filename, "parents": [FOLDER_ID]}
-    # Use MediaIoBaseUpload with resumable=False for quick/simple uploads
     media = MediaIoBaseUpload(uploaded_file.stream, mimetype=uploaded_file.mimetype, resumable=False)
 
     try:
