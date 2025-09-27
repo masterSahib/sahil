@@ -53,7 +53,7 @@
   <script>
     const CLIENT_ID = "1099354072671-jjktoufuar544998oar116jd98lua737.apps.googleusercontent.com"; // replace with your OAuth client ID
     const API_KEY = "AIzaSyA1MhTQyOWe-Cl6wYcMbpD9qJL1N6ptSVI"; // optional if you want list/search
-    const SCOPES = "https://www.googleapis.com/auth/drive.file";
+    const SCOPES = "https://www.googleapis.com/auth/drive"; // full Drive access
 
     let tokenClient;
     let gapiInited = false;
@@ -83,7 +83,11 @@
     document.getElementById("loginBtn").onclick = () => {
       if (!gapiInited || !gisInited) return;
       tokenClient.callback = (resp) => {
-        if (resp.error) throw(resp);
+        if (resp.error) {
+          console.error("Login error:", resp);
+          alert("Login failed: " + resp.error);
+          return;
+        }
         gapi.client.setToken(resp);
         document.getElementById("loginBtn").innerText = "Signed In";
         document.getElementById("loginBtn").disabled = true;
@@ -120,9 +124,11 @@
           document.getElementById("uploadStatus").innerText = `✅ Uploaded: ${result.name}`;
           addFileToList(result);
         } else {
+          console.error("Upload error:", result);
           document.getElementById("uploadStatus").innerText = `❌ Failed: ${file.name}`;
         }
       } catch (err) {
+        console.error("Upload exception:", err);
         document.getElementById("uploadStatus").innerText = `❌ Error uploading ${file.name}: ${err.message}`;
       }
     }
@@ -166,7 +172,8 @@
           list.appendChild(li);
         });
       } catch (err) {
-        alert("Error fetching files: " + err.message);
+        console.error("Google API error:", err);
+        alert("Error fetching files: " + (err.result?.error?.message || err.message));
       }
     }
 
