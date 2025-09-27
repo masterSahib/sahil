@@ -29,6 +29,9 @@
       <button id="uploadBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
         Upload to Drive
       </button>
+      <button id="testUploadBtn" class="ml-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+        Test Upload (sahil.txt)
+      </button>
       <p id="uploadStatus" class="mt-2 text-sm text-gray-600"></p>
     </section>
 
@@ -93,38 +96,53 @@
       tokenClient.requestAccessToken({prompt: 'consent'});
     };
 
-    // Upload file
+    // Upload selected files
     document.getElementById("uploadBtn").onclick = async () => {
       const files = document.getElementById("fileInput").files;
       if (files.length === 0) return alert("Please select files");
 
       for (let file of files) {
-        try {
-          const metadata = {
-            name: file.name,
-            mimeType: file.type
-          };
-          const form = new FormData();
-          form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-          form.append("file", file);
-
-          const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-            method: "POST",
-            headers: new Headers({ "Authorization": "Bearer " + gapi.client.getToken().access_token }),
-            body: form
-          });
-          const result = await res.json();
-          if (result.id) {
-            document.getElementById("uploadStatus").innerText = `✅ Uploaded: ${result.name}`;
-          } else {
-            document.getElementById("uploadStatus").innerText = `❌ Failed: ${file.name}`;
-          }
-        } catch (err) {
-          document.getElementById("uploadStatus").innerText = `❌ Error uploading ${file.name}: ${err.message}`;
-        }
+        await uploadFile(file);
       }
       listFiles();
     };
+
+    // Upload sahil.txt (like Python script)
+    document.getElementById("testUploadBtn").onclick = async () => {
+      const testFile = new File([
+        "Hello! This is a test upload using google-api-js-client."
+      ], "sahil.txt", { type: "text/plain" });
+
+      await uploadFile(testFile);
+      listFiles();
+    };
+
+    // Generic upload function
+    async function uploadFile(file) {
+      try {
+        const metadata = {
+          name: file.name,
+          mimeType: file.type
+        };
+        const form = new FormData();
+        form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+        form.append("file", file);
+
+        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+          method: "POST",
+          headers: new Headers({ "Authorization": "Bearer " + gapi.client.getToken().access_token }),
+          body: form
+        });
+        const result = await res.json();
+        if (result.id) {
+          document.getElementById("uploadStatus").innerText = `✅ Uploaded: ${result.name}`;
+        } else {
+          document.getElementById("uploadStatus").innerText = `❌ Failed: ${file.name}`;
+        }
+      } catch (err) {
+        document.getElementById("uploadStatus").innerText = `❌ Error uploading ${file.name}: ${err.message}`;
+      }
+    }
 
     // List files
     async function listFiles() {
@@ -144,4 +162,12 @@
         li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
         li.innerHTML = `
           <span>${f.name} <span class="text-sm text-gray-400">(${new Date(f.createdTime).toLocaleString()})</span></span>
-          <a hre
+          <a href="${f.webViewLink}" target="_blank" class="text-blue-600 hover:underline">View</a>
+        `;
+        list.appendChild(li);
+      });
+    }
+  </script>
+
+</body>
+</html>
