@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SBS University Gurdaspur - File Portal</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
@@ -52,9 +52,6 @@
   </footer>
 
   <script>
-    // ==============================
-    // Google Drive API Configuration
-    // ==============================
 const CLIENT_ID = "1099354072671-jjktoufuar544998oar116jd98lua737.apps.googleusercontent.com";
 const API_KEY = "AIzaSyA1MhTQyOWe-Cl6wYcMbpD9qJL1N6ptSVI";
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
@@ -80,7 +77,7 @@ function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: '' // will be set on login
+    callback: '' // will be set during login
   });
   gisInited = true;
 }
@@ -173,7 +170,7 @@ async function listFiles() {
     list.appendChild(li);
   });
 }
+  </script>
 
 </body>
 </html>
-
