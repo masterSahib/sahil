@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SBS University Gurdaspur - File Portal</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
@@ -16,7 +16,6 @@
   </header>
 
   <main class="flex-grow max-w-6xl mx-auto px-6 py-8">
-
     <!-- Upload Section -->
     <section class="bg-white rounded-2xl shadow p-6 mb-8">
       <h2 class="text-xl font-semibold text-gray-700 mb-4">Upload Files</h2>
@@ -25,73 +24,178 @@
         Upload to Drive
       </button>
       <p id="uploadStatus" class="mt-2 text-sm text-gray-600"></p>
+
+      <div id="uploadsContainer" class="mt-4 space-y-3"></div>
     </section>
 
     <!-- Uploaded Files Section -->
     <section class="bg-white rounded-2xl shadow p-6 mb-8">
-      <h2 class="text-xl font-semibold text-gray-700 mb-4">Uploaded Files</h2>
-      <ul id="fileList" class="space-y-3">
-        <!-- Files will be listed here dynamically -->
-      </ul>
+      <h2 class="text-xl font-semibold text-gray-700 mb-4">Uploaded Files (recent)</h2>
+      <ul id="fileList" class="space-y-3"></ul>
     </section>
   </main>
 
-  <!-- Footer -->
   <footer class="bg-gray-800 text-gray-300 py-4 text-center">
     <p>© 2025 SADAR BEANT SINGH UNIVERSITY, GURDASPUR</p>
   </footer>
 
   <script>
-    // Use relative path so frontend works directly with the same backend domain
-    const BACKEND_URL = ""; 
+    // Use relative path; when served from the same domain, this hits your Flask endpoint
+    const UPLOAD_URL = "/upload";
 
     document.getElementById("uploadBtn").onclick = async () => {
       const files = document.getElementById("fileInput").files;
-      if (files.length === 0) return alert("Please select files");
+      if (!files || files.length === 0) {
+        alert("Please select files");
+        return;
+      }
 
-      for (let file of files) {
-        await uploadFile(file);
+      // clear global upload status
+      document.getElementById("uploadStatus").innerText = "";
+
+      for (const file of files) {
+        await uploadFileXHR(file);
       }
     };
 
-    async function uploadFile(file) {
-      try {
+    function createUploadRow(filename) {
+      const container = document.getElementById("uploadsContainer");
+      const row = document.createElement("div");
+      row.className = "bg-gray-50 p-4 rounded-lg shadow";
+
+      row.innerHTML = `
+        <div class="flex justify-between items-center mb-2">
+          <div class="font-medium">${escapeHtml(filename)}</div>
+          <div class="text-sm text-gray-500 upload-status">Waiting</div>
+        </div>
+        <div class="w-full bg-gray-200 rounded h-3 overflow-hidden mb-2">
+          <div class="progress-bar h-full bg-blue-600" style="width:0%"></div>
+        </div>
+        <pre class="text-xs text-gray-700 hidden debug-response bg-white p-2 rounded border"></pre>
+        <div class="mt-2 flex gap-2">
+          <button class="retry-btn hidden bg-yellow-400 text-black px-3 py-1 rounded">Retry</button>
+          <button class="copy-btn hidden bg-gray-200 text-gray-800 px-3 py-1 rounded">Copy Details</button>
+        </div>
+      `;
+      container.prepend(row);
+      return row;
+    }
+
+    function escapeHtml(s) {
+      return (s + "").replace(/[&<>"']/g, function(m) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+      });
+    }
+
+    function uploadFileXHR(file) {
+      return new Promise((resolve) => {
+        const row = createUploadRow(file.name);
+        const statusEl = row.querySelector(".upload-status");
+        const progressBar = row.querySelector(".progress-bar");
+        const debugPre = row.querySelector(".debug-response");
+        const retryBtn = row.querySelector(".retry-btn");
+        const copyBtn = row.querySelector(".copy-btn");
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", UPLOAD_URL);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = pct + "%";
+            statusEl.innerText = `Uploading — ${pct}%`;
+          } else {
+            statusEl.innerText = `Uploading...`;
+          }
+        };
+
+        xhr.onload = () => {
+          let text = xhr.responseText || "";
+          let parsed = null;
+          try { parsed = JSON.parse(text); } catch (err) { /* ignore */ }
+
+          if (xhr.status >= 200 && xhr.status < 300 && parsed && parsed.success) {
+            statusEl.innerText = "✅ Uploaded";
+            progressBar.style.width = "100%";
+            // show file in fileList
+            addFileToList(parsed.file);
+            debugPre.classList.add("hidden");
+            retryBtn.classList.add("hidden");
+            copyBtn.classList.add("hidden");
+            document.getElementById("uploadStatus").innerText = `✅ Uploaded: ${parsed.file.name}`;
+            resolve(parsed);
+          } else {
+            // Error: show server response
+            let message = `HTTP ${xhr.status} ${xhr.statusText}`;
+            if (parsed) {
+              if (parsed.error) message += ` — ${parsed.error}`;
+              if (parsed.google_error) message += `\nGoogle error: ${parsed.google_error}`;
+              if (parsed.traceback) message += `\nTraceback:\n${parsed.traceback}`;
+            } else if (text) {
+              message += `\n${text}`;
+            }
+            statusEl.innerText = "❌ Failed";
+            progressBar.style.width = "0%";
+            debugPre.textContent = message;
+            debugPre.classList.remove("hidden");
+            retryBtn.classList.remove("hidden");
+            copyBtn.classList.remove("hidden");
+            document.getElementById("uploadStatus").innerText = `❌ Failed to upload ${file.name}: check details below.`;
+            retryBtn.onclick = () => {
+              // reset UI and retry
+              progressBar.style.width = "0%";
+              debugPre.classList.add("hidden");
+              retryBtn.classList.add("hidden");
+              copyBtn.classList.add("hidden");
+              statusEl.innerText = "Retrying...";
+              uploadFileXHR(file).then(resolve);
+            };
+            copyBtn.onclick = () => {
+              navigator.clipboard.writeText(debugPre.textContent).then(()=> {
+                copyBtn.innerText = "Copied";
+                setTimeout(()=> copyBtn.innerText = "Copy Details", 1500);
+              });
+            };
+            resolve({ success: false, error: message });
+          }
+        };
+
+        xhr.onerror = () => {
+          statusEl.innerText = "❌ Network error";
+          debugPre.textContent = "Network error while uploading — possibly blocked by CORS or network.";
+          debugPre.classList.remove("hidden");
+          retryBtn.classList.remove("hidden");
+          copyBtn.classList.remove("hidden");
+          document.getElementById("uploadStatus").innerText = `❌ Network error uploading ${file.name}`;
+          resolve({ success: false, error: "network error" });
+        };
+
         const formData = new FormData();
         formData.append("file", file);
-
-        const res = await fetch(`/upload`, {
-          method: "POST",
-          body: formData
-        });
-
-        if (!res.ok) {
-          document.getElementById("uploadStatus").innerText = `❌ Failed to upload ${file.name}: ${res.statusText}`;
-          return;
-        }
-
-        const result = await res.json();
-        if (result.success) {
-          document.getElementById("uploadStatus").innerText = `✅ Uploaded: ${result.file.name}`;
-          addFileToList(result.file);
-        } else {
-          document.getElementById("uploadStatus").innerText = `❌ Failed: ${file.name} (${result.error})`;
-        }
-      } catch (err) {
-        document.getElementById("uploadStatus").innerText = `❌ Error uploading ${file.name}: ${err.message}`;
-      }
+        xhr.send(formData);
+      });
     }
 
     function addFileToList(file) {
       const list = document.getElementById("fileList");
-      let li = document.createElement("li");
+      const li = document.createElement("li");
       li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
       li.innerHTML = `
-        <span>${file.name}</span>
+        <span>${escapeHtml(file.name)}</span>
         <a href="${file.webViewLink}" target="_blank" class="text-blue-600 hover:underline">View</a>
       `;
       list.prepend(li);
     }
-  </script>
 
+    // Quick helper: allow dropping files
+    const fileInput = document.getElementById("fileInput");
+    document.body.addEventListener("dragover", e => e.preventDefault());
+    document.body.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+      }
+    });
+  </script>
 </body>
 </html>
