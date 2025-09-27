@@ -59,6 +59,7 @@ const SCOPES = "https://www.googleapis.com/auth/drive.file";
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
+let accessToken = null;
 
 // Load Google API client
 function gapiLoaded() {
@@ -77,21 +78,20 @@ function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: '' // will be set during login
+    callback: (resp) => {
+      if (resp.error) throw resp;
+      accessToken = resp.access_token;
+      gapi.client.setToken({ access_token: accessToken });
+      listFiles();
+      document.getElementById("loginBtn").innerText = "Signed In";
+      document.getElementById("loginBtn").disabled = true;
+    }
   });
   gisInited = true;
 }
 
 document.getElementById("loginBtn").onclick = () => {
   if (!gapiInited || !gisInited) return;
-  tokenClient.callback = (resp) => {
-    if (resp.error) throw (resp);
-    // Store token so gapi.client.getToken() works
-    gapi.client.setToken(resp);
-    listFiles();
-    document.getElementById("loginBtn").innerText = "Signed In";
-    document.getElementById("loginBtn").disabled = true;
-  };
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
@@ -127,12 +127,11 @@ async function uploadFile(file) {
     form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
     form.append("file", file);
 
-    const token = gapi.client.getToken();
-    if (!token) throw new Error("User not signed in / token missing");
+    if (!accessToken) throw new Error("User not signed in / token missing");
 
     const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
       method: "POST",
-      headers: new Headers({ "Authorization": "Bearer " + token.access_token }),
+      headers: new Headers({ "Authorization": "Bearer " + accessToken }),
       body: form
     });
 
@@ -149,26 +148,30 @@ async function uploadFile(file) {
 
 // List files
 async function listFiles() {
-  let response = await gapi.client.drive.files.list({
-    'pageSize': 20,
-    'fields': 'files(id, name, webViewLink, createdTime)',
-  });
-  let files = response.result.files;
-  const list = document.getElementById("fileList");
-  list.innerHTML = "";
-  if (!files || files.length == 0) {
-    list.innerHTML = "<li class='text-gray-500'>No files found.</li>";
-    return;
+  try {
+    let response = await gapi.client.drive.files.list({
+      'pageSize': 20,
+      'fields': 'files(id, name, webViewLink, createdTime)',
+    });
+    let files = response.result.files;
+    const list = document.getElementById("fileList");
+    list.innerHTML = "";
+    if (!files || files.length == 0) {
+      list.innerHTML = "<li class='text-gray-500'>No files found.</li>";
+      return;
+    }
+    files.forEach(f => {
+      let li = document.createElement("li");
+      li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
+      li.innerHTML = `
+        <span>${f.name} <span class="text-sm text-gray-400">(${new Date(f.createdTime).toLocaleString()})</span></span>
+        <a href="${f.webViewLink}" target="_blank" class="text-blue-600 hover:underline">View</a>
+      `;
+      list.appendChild(li);
+    });
+  } catch (err) {
+    console.error("Error listing files", err);
   }
-  files.forEach(f => {
-    let li = document.createElement("li");
-    li.className = "bg-gray-50 p-4 rounded-lg shadow flex justify-between";
-    li.innerHTML = `
-      <span>${f.name} <span class="text-sm text-gray-400">(${new Date(f.createdTime).toLocaleString()})</span></span>
-      <a href="${f.webViewLink}" target="_blank" class="text-blue-600 hover:underline">View</a>
-    `;
-    list.appendChild(li);
-  });
 }
   </script>
 
